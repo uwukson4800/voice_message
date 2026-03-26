@@ -308,9 +308,10 @@ local function send_raw(buf)
     ffi.fill(ptr, ffi.sizeof('cclc_msg_voice_data_t'), 0)
     voice_init_fn(ptr)
     
+    -- https://github.com/perilouswithadollarsign/cstrike15_src/blob/f82112a2388b841d72cb62ca48ab1846dfcc11c8/engine/servermsghandler.cpp#L545
+
     local base = ffi.cast('uintptr_t', ffi.cast('void*', ptr))
-    ffi.cast('uint32_t*', base + 0x34)[0] = 63 -- has_bits
-    ffi.cast('int32_t*',  base + 0x20)[0] = 0 -- format
+    ffi.cast('uint32_t*', base + 0x34)[0] = 0x09 -- has_bits
     
     voice_set_fn(ffi.cast('void*', base + 0x8), buf._data, buf:bytes_written())
     send_net_msg_fn( ffi.cast('i_net_channel_info*', client_state[0].m_net_channel), ffi.cast('void*', 0), ffi.cast('c_net_message*', ptr), false, true )
