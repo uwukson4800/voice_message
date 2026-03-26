@@ -57,7 +57,7 @@ local function to_absolute(ptr)
 end
 
 local client_state = ffi.cast('i_client_state***', find_sig('engine.dll', '\xA1\xCC\xCC\xCC\xCC\x8B\x80\xCC\xCC\xCC\xCC\xC3', 1) or error('clientstate'))[0][0]
-local send_net_msg_fn = ffi.cast('send_net_msg_t', find_sig('engine.dll', '\x55\x8B\xEC\x83\xEC\x08\x56\x8B\xF1\x8B\x4D\x04') or error('sendnetmsg'))
+local send_net_msg_fn = ffi.cast('send_net_msg_t', find_sig('engine.dll', '\xF1\x8B\x4D\x04\xE8\xCC\xCC\xCC\xCC\x8B\x86\xCC\xCC\xCC\xCC\x85\xC0\x74\x24\x48\x83\xF8\x02\x77\x2C\x83\xBE\xCC\xCC\xCC\xCC\xCC\x8D\x8E\xCC\xCC\xCC\xCC\x74\x06\x32\xC0\x84\xC0', -0x8) or error('sendnetmsg'))
 local voice_init_fn = ffi.cast('void*(__thiscall*)(void*)', to_absolute( find_sig('engine.dll', '\xE8\xCC\xCC\xCC\xCC\x56\x8D\x84\x24\xCC\xCC\xCC\xCC\x50\x8D\x4C\x24\x28') or error('voice_init')))
 local voice_set_fn = ffi.cast('void*(__thiscall*)(void*, void*, size_t)', to_absolute( find_sig('engine.dll', '\xE8\xCC\xCC\xCC\xCC\x83\x4C\x24\xCC\xCC\x83\x7C\x24') or error('voice_set')))
 
@@ -302,21 +302,22 @@ local voice_message = {}
 local registered_events = {}
 
 local function send_raw(buf)
-    if buf:is_overflow() then return false end
+    if buf:is_overflow() then
+        return false
+    end
     
     local ptr = ffi.new('cclc_msg_voice_data_t')
     ffi.fill(ptr, ffi.sizeof('cclc_msg_voice_data_t'), 0)
     voice_init_fn(ptr)
     
-    -- https://github.com/perilouswithadollarsign/cstrike15_src/blob/f82112a2388b841d72cb62ca48ab1846dfcc11c8/engine/servermsghandler.cpp#L545
+    -- TODO: https://github.com/perilouswithadollarsign/cstrike15_src/blob/f82112a2388b841d72cb62ca48ab1846dfcc11c8/engine/servermsghandler.cpp#L545
 
     local base = ffi.cast('uintptr_t', ffi.cast('void*', ptr))
-    ffi.cast('uint32_t*', base + 0x34)[0] = 0x09 -- has_bits
-    
+    ffi.cast('uint32_t*', base + 0x34)[0] = 63
+    ffi.cast('int32_t*', base + 0x20)[0] = 0 -- https://github.com/perilouswithadollarsign/cstrike15_src/blob/f82112a2388b841d72cb62ca48ab1846dfcc11c8/engine/audio/public/voice.h#L86C1-L90C3
+
     voice_set_fn(ffi.cast('void*', base + 0x8), buf._data, buf:bytes_written())
-    send_net_msg_fn( ffi.cast('i_net_channel_info*', client_state[0].m_net_channel), ffi.cast('void*', 0), ffi.cast('c_net_message*', ptr), false, true )
-    
-    return true
+    return send_net_msg_fn( ffi.cast('i_net_channel_info*', client_state[0].m_net_channel), nil, ffi.cast('c_net_message*', ptr), false, true )
 end
 
 function voice_message.send(event_or_callback, callback)
